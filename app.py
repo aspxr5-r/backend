@@ -6,13 +6,15 @@ from modules.database import test_connection
 import logging
 import os
 from datetime import timedelta
+from config import FLASK_SECRET_KEY, MONGODB_URI, DATABASE_NAME, OPENAI_API_KEY
+import traceback
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
 csrf = CSRFProtect(app)
 
 # Set the secret key
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your_development_secret_key_here')
+app.secret_key = FLASK_SECRET_KEY
 
 # Session configuration
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
@@ -42,22 +44,28 @@ def hello():
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
-        result = auth.register()
+        data = request.get_json()
+        logger.info(f"Received registration request: {data}")
+        result = auth.register(data)  # Pass the data to the register function
         logger.info(f"User registered: {result}")
-        return result
+        return jsonify(result), 201  # Ensure we're returning JSON
     except Exception as e:
         logger.error(f"Error during registration: {str(e)}")
-        return jsonify({"error": "Registration failed"}), 500
+        logger.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/login', methods=['POST'])
-def login():
+def login_route():
     try:
-        result = auth.login()
-        logger.info(f"User logged in: {result}")
-        return result
+        data = request.get_json()
+        logger.info(f"Received login request: {data}")
+        result, status_code = auth.login(data)
+        logger.info(f"User login attempt: {result}")
+        return jsonify(result), status_code
     except Exception as e:
         logger.error(f"Error during login: {str(e)}")
-        return jsonify({"error": "Login failed"}), 500
+        logger.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
@@ -136,6 +144,16 @@ def check_auth():
         return jsonify({"authenticated": True}), 200
     logger.info("Auth check: No user authenticated")
     return jsonify({"authenticated": False}), 401
+
+@app.route('/api/test', methods=['GET'])
+def test():
+    return jsonify({"message": "Test successful"}), 200
+
+@app.errorhandler(Exception)
+def handle_error(e):
+    logger.error(f"Unhandled exception: {str(e)}")
+    logger.error(traceback.format_exc())
+    return jsonify({"error": "An unexpected error occurred"}), 500
 
 if __name__ == '__main__':
     logger.info("Starting the application...")

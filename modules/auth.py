@@ -6,8 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def register():
-    data = request.json
+def register(data):
     username = data.get('username')
     password = data.get('password')
 
@@ -15,11 +14,11 @@ def register():
     
     if not username or not password:
         logger.warning("Username or password missing")
-        return jsonify({"error": "Username and password are required"}), 400
+        return {"error": "Username and password are required"}, 400
     
     if users.find_one({"username": username}):
         logger.warning(f"Username {username} already exists")
-        return jsonify({"error": "Username already exists"}), 400
+        return {"error": "Username already exists"}, 400
     
     hashed_password = generate_password_hash(password)
     user_id = users.insert_one({
@@ -29,23 +28,20 @@ def register():
 
     logger.info(f"User {username} registered successfully")
     
-    return jsonify({"message": "User registered successfully", "user_id": str(user_id)}), 201
-
-def login():
-    data = request.json
+    return {"message": "User registered successfully", "user_id": str(user_id)}, 201
+def login(data):
     username = data.get('username')
     password = data.get('password')
     
     if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
+        return {"error": "Username and password are required"}, 400
     
     user = users.find_one({"username": username})
     if user and check_password_hash(user['password'], password):
         session['user_id'] = str(user['_id'])
-        return jsonify({"message": "Logged in successfully", "user_id": str(user['_id'])}), 200
+        return {"message": "Logged in successfully", "user_id": str(user['_id'])}, 200
     
-    return jsonify({"error": "Invalid username or password"}), 401
-
+    return {"error": "Invalid username or password"}, 401
 def logout():
     if 'user_id' in session:
         session.pop('user_id', None)
